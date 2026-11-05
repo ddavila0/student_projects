@@ -1,0 +1,49 @@
+# ===== input data =====
+# --input datafile (not sure will the data file separated by different weeks or in the same file)
+# dst_sites: all T2_US Input which site is using
+# Time range: --start / --end : Year-month-day
+
+
+# ===== columns =====
+# 'data.timestamp_tr_comp', 'data.transferred_volume','data.throughput',
+# 'data.timestamp_tr_st', 'data.t_final_transfer_state','data.src_experiment_site','data.dst_experiment_site','data.activity'
+columns:
+  source: src_experiment_site
+  destination: dst_experiment_site
+  start: timestamp_tr_st
+  complete: timestamp_tr_comp
+  volume: transferred_volume
+  #throughput: throughput
+  activity: activity
+  #state: t_final_transfer_state
+
+# ===== src sites：CERN + T1 + T2_US =====
+source_sites:
+  - "T0_CH_CERN*"
+  - "T1_*"
+  - "T2_US_*"
+# ===== units =====
+timestamp_unit: ms
+
+# ===== filter checking =====
+
+checks:
+  state: Ok          # state = Ok
+  min_volume: 0        # volume > 0
+  min_throughput: 0    # throughput > 0
+  exclude_activities: [ ASO ]       # fliter out ASO
+  exclude_sources: [ UNKNOWN ]      # filter out UNKNOWN
+
+
+# ===== Time window =====
+throughput_window: 10min
+agg_window: 10min
+
+# ===== ML model K-fold =====
+model:
+  n_spilt: 8
+  randam_state: 42
+
+# ===== output=====
+output: outputs
+save_plots: true
