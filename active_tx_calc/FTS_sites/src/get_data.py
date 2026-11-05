@@ -8,28 +8,36 @@ log = logging.getLogger(__name__)
 
 def load_file(path, cfg):
     path = Path(path)
-    df = pd.read_csv(path)
-    log.info("Load %s: %d records", path, len(df))
+    file_cols = list(cfg["columns"].values())  # only read the columns we need
+
+    if path.suffix == ".parquet":
+        day_dirs = [path]  # also allow a single day as --input
+    else:
+        day_dirs = sorted(path.glob("*.parquet"))
+    if not day_dirs:
+        raise SystemExit(f"no *.parquet found in {path}")
+
+    frames = []
+    for d in day_dirs:
+        day = pd.read_parquet(d, columns=file_cols)
+        log.info("Load %s: %d records", d.name, len(day))
+        frames.append(day)
+    df = pd.concat(frames, ignore_index=True)
+    log.info("Load %s: %d days, %d records in total", path.name, len(day_dirs), len(df))
 
     # match column name
     mapping = {file_col: name for name, file_col in cfg["columns"].items()}
     df = df.rename(columns=mapping)[list(mapping.values())]
 
+    # timestamps: numbers (ms) -> datetime; if already datetime, leave as it is
     unit = cfg.get("timestamp_unit")
     for col in ("start", "complete"):
-        df[col] = pd.to_datetime(df[col], unit=unit) if unit else pd.to_datetime(df[col])
+        if pd.api.types.is_numeric_dtype(df[col]):
+            df[col] = pd.to_datetime(df[col], unit=unit)
+        else:
+            df[col] = pd.to_datetime(df[col])
     return df
 
-def filter_period(df, cfg):
-# by --start and --end to filter out which period of time we are analyzing.
-# (delete if different weeks in different file)
-    start, end = cfg["period"]["start"], cfg["period"]["end"]
-    df = df[(df["start"] >= pd.Timestamp(start)) & (df["start"] < pd.Timestamp(end))]
-# check if the time period is selected
-    if df.empty:
-        raise SystemExit("there is no data in the time period --start / --end")
-    log.info("time_range: %s ~ %s: %d records", start, end, len(df))
-    return df
 
 def select_sources(df, cfg):
     # filter out any src_site which is not CERN, T1, T2_US (if not done before)

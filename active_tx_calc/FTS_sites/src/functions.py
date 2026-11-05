@@ -1,32 +1,32 @@
 import pandas as pd
 
-
 def compute_throughput(df, time_points):
+    # window length in seconds (from config throughput_window, e.g. 10min -> 600)
+    window_sec = (time_points[1] - time_points[0]).total_seconds()
     records = []
     for i in range(len(time_points) - 1):
         # window start
         t_start = time_points[i]
-        # window ends = start time + 1 min
+        # window ends = start time + window length
         t_end = time_points[i + 1]
         # Determine active transfer count: the transfer started at or before t_start, and ends after t_start
         # at the exact time, concurrent transfers
-        time_mask = (df['start_dt'] < t_end) & (df['end_dt'] > t_start)
+        time_mask = (df['start'] < t_end) & (df['complete'] > t_start)
         active = df[time_mask]
         # If no transfers are active in this window, skip it
         if len(active) == 0:
             records.append(0.0)
             continue
         # Compute the throughput within this window
-        overlap_start = active['start_dt'].clip(lower=t_start)
-        overlap_end = active['end_dt'].clip(upper=t_end)
+        overlap_start = active['start'].clip(lower=t_start)
+        overlap_end = active['complete'].clip(upper=t_end)
         # How long this transfer is actually active within the window
         overlap_sec = (overlap_end - overlap_start).dt.total_seconds()
-        total_sec = (active['end_dt'] - active['start_dt']).dt.total_seconds()
-        bytes_in_window = active['transferred_volume'] * (overlap_sec / total_sec)
+        total_sec = (active['complete'] - active['start']).dt.total_seconds()
+        bytes_in_window = active['volume'] * (overlap_sec / total_sec)
         #Assuming a uniform transfer rate, allocate the total volume to this window (and unit calculation)
-        records.append(bytes_in_window.sum() / 60 )  # bytes/s
+        records.append(bytes_in_window.sum() / window_sec)  # bytes/s
     return records
-
 
 
 def compute_active(df, time_points):
@@ -35,10 +35,9 @@ def compute_active(df, time_points):
         t_start = time_points[i]
         t_end = time_points[i + 1]
         # count every transfer that exists at any moment within [t_start, t_end)
-        time_mask = (df['start_dt'] < t_end) & (df['end_dt'] > t_start)
+        time_mask = (df['start'] < t_end) & (df['complete'] > t_start)
         counts.append(int(time_mask.sum()))
     return counts
-
 
 def build_model_data(df, sources, cfg):
     tp_win, agg_win = cfg["throughput_window"], cfg["agg_window"]

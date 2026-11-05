@@ -41,8 +41,8 @@ agg_window: 10min
 
 # ===== ML model K-fold =====
 model:
-  n_spilt: 8
-  randam_state: 42
+  n_splits: 8
+  random_state: 42
 
 # ===== output=====
 output: outputs
